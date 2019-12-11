@@ -9,6 +9,20 @@
 const int WIDTH = 800;
 const int HEIGHT = 600;
 
+
+// Validation layers are for debugging purposes
+const std::vector<const char*> validationLayers = {
+    // standard validation that comes with the SDK
+    "VK_LAYER_KHRONOS_validation"
+};
+
+// If not in debug mode, don't enable the validation layers
+#ifdef NDEBUG
+    const bool enableValidationLayers = false;
+#else
+    const bool enableValidationLayers = true;
+#endif
+
 class HelloTriangleApplication {
 
     public:
@@ -51,6 +65,10 @@ class HelloTriangleApplication {
     }
     
     void createInstance() {
+        if (enableValidationLayers && !checkValidationLayerSupport()) {
+            throw std::runtime_error("Validation layers required but not available on this system");
+        }
+        
         VkApplicationInfo appInfo = {}; // We provide some info to the graphics driver about our app. Not mandatory but can help the driver with app or engine-specific optimizations
         appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO; // Many structs in Vulkan have this field, it's mandatory
         appInfo.pApplicationName = "Hello Triangle";
@@ -62,6 +80,14 @@ class HelloTriangleApplication {
         VkInstanceCreateInfo createInfo = {}; // Mandatory struct indicating global (as in program-wide and as opposed to device-specific) extensions and validation layers (for debugging)
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         createInfo.pApplicationInfo = &appInfo; // points to the VkApplicationInfo struct above
+        
+        if (enableValidationLayers) {
+            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+            createInfo.ppEnabledLayerNames = validationLayers.data();
+        } else {
+            createInfo.enabledLayerCount = 0;
+        }
+        
         /* Now, in order to deal with GLFW windowing we need extensions because Vulkan is platform agnostic.
          GLFW provides a method that returns the list of Vulkan extensions it requires and receives a pointer to an uint which it will use to write the number of these extensions.
          We wrap this method so we can use it around.
@@ -72,7 +98,6 @@ class HelloTriangleApplication {
         const char** glfwExtensions = listGlfwRequiredExtensions(&glfwExtensionCount);
         createInfo.enabledExtensionCount = glfwExtensionCount;
         createInfo.ppEnabledExtensionNames = glfwExtensions;
-        createInfo.enabledLayerCount = 0; // Won't use validation layers now
         
         /* Actually create the instance
          The general pattern that object creation function parameters in Vulkan follow is:
@@ -152,6 +177,30 @@ class HelloTriangleApplication {
 
         // Do all the required extensions match?
         return matchingExtensions == glfwExtensionCount;
+    }
+    
+    bool checkValidationLayerSupport() {
+        uint32_t layerCount;
+        vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+        std::vector<VkLayerProperties> availableLayers(layerCount);
+        vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+        
+        for (const char* layerName : validationLayers) {
+            bool layerFound = false;
+            
+            for (const auto& layerProperties : availableLayers) {
+                if (strcmp(layerName, layerProperties.layerName) == 0) {
+                    layerFound = true;
+                    break;
+                }
+            }
+            
+            if (!layerFound) {
+                return false;
+            }
+        }
+        
+        return true;
     }
 };
 
