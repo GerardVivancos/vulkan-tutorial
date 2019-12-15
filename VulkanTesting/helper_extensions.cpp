@@ -35,7 +35,7 @@ void printVulkanSupportedExtensions() {
     }
 }
 
-const char** listGlfwRequiredExtensions(uint32_t* count) {
+const std::vector<const char*> listGlfwRequiredExtensions(uint32_t* count) {
     // GLFW provides a method that returns the list of Vulkan extensions it requires and receives a pointer to an uint which it will use to write the number of these extensions.
     uint32_t glfwExtensionCount = 0;
     const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -43,12 +43,15 @@ const char** listGlfwRequiredExtensions(uint32_t* count) {
     if (count != nullptr) {
         *count = glfwExtensionCount;
     }
-    return glfwExtensions;
+    
+    // This constructor expects a range: [first, last).
+    std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    return extensions;
 }
 
 void printGlfwRequiredExtensions() {
     uint32_t glfwExtensionCount = 0;
-    const char** glfwExtensions = listGlfwRequiredExtensions(&glfwExtensionCount);
+    std::vector<const char*> glfwExtensions = listGlfwRequiredExtensions(&glfwExtensionCount);
     std::cout << "Required extensions for GLFW: " << glfwExtensionCount << std::endl;
     for (int i = 0; i < glfwExtensionCount; i++)  {
         std::cout << "**\t" << glfwExtensions[i] << std::endl;
@@ -59,7 +62,7 @@ bool checkGlfwRequiredExtensionsAvailable() {
     uint32_t glfwExtensionCount = 0;
     uint32_t vulkanExtensionCount = 0;
     uint32_t matchingExtensions = 0;
-    const char** glfwExtensions = listGlfwRequiredExtensions(&glfwExtensionCount);
+    std::vector<const char*> glfwExtensions = listGlfwRequiredExtensions(&glfwExtensionCount);
     const std::vector<VkExtensionProperties> vulkanExtensions = listVulkanSupportedExtensions(&vulkanExtensionCount);
 
     for (int i = 0; i < glfwExtensionCount; i++) {

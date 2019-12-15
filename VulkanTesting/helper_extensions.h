@@ -17,6 +17,6 @@
 
 const std::vector<VkExtensionProperties> listVulkanSupportedExtensions(uint32_t* count = nullptr);
 void printVulkanSupportedExtensions();
-const char** listGlfwRequiredExtensions(uint32_t* count = nullptr);
+const std::vector<const char*> listGlfwRequiredExtensions(uint32_t* count = nullptr);
 void printGlfwRequiredExtensions();
 bool checkGlfwRequiredExtensionsAvailable();

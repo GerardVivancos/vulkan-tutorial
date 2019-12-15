@@ -96,9 +96,9 @@ class HelloTriangleApplication {
          */
 
         uint32_t glfwExtensionCount = 0;
-        const char** glfwExtensions = listGlfwRequiredExtensions(&glfwExtensionCount);
+        std::vector<const char*> glfwExtensions = listGlfwRequiredExtensions(&glfwExtensionCount);
         createInfo.enabledExtensionCount = glfwExtensionCount;
-        createInfo.ppEnabledExtensionNames = glfwExtensions;
+        createInfo.ppEnabledExtensionNames = glfwExtensions.data();
         
         /* Actually create the instance
          The general pattern that object creation function parameters in Vulkan follow is:
