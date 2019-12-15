@@ -27,7 +27,7 @@ const std::vector<VkExtensionProperties> listVulkanSupportedExtensions(uint32_t*
 
 void printVulkanSupportedExtensions() {
     uint32_t extensionCount = 0;
-    std::vector<VkExtensionProperties> extensions = listVulkanSupportedExtensions(&extensionCount);
+    const std::vector<VkExtensionProperties> extensions = listVulkanSupportedExtensions(&extensionCount);
     std::cout << "Available extensions: " << extensionCount << std::endl;
     // "const auto&" lets us access the values without a copy (&), and prevents their accidental modification (const)
     for (const auto& extension: extensions) {
@@ -51,7 +51,7 @@ const std::vector<const char*> listGlfwRequiredExtensions(uint32_t* count) {
 
 void printGlfwRequiredExtensions() {
     uint32_t glfwExtensionCount = 0;
-    std::vector<const char*> glfwExtensions = listGlfwRequiredExtensions(&glfwExtensionCount);
+    const std::vector<const char*> glfwExtensions = listGlfwRequiredExtensions(&glfwExtensionCount);
     std::cout << "Required extensions for GLFW: " << glfwExtensionCount << std::endl;
     for (int i = 0; i < glfwExtensionCount; i++)  {
         std::cout << "**\t" << glfwExtensions[i] << std::endl;
@@ -62,7 +62,7 @@ bool checkGlfwRequiredExtensionsAvailable() {
     uint32_t glfwExtensionCount = 0;
     uint32_t vulkanExtensionCount = 0;
     uint32_t matchingExtensions = 0;
-    std::vector<const char*> glfwExtensions = listGlfwRequiredExtensions(&glfwExtensionCount);
+    const std::vector<const char*> glfwExtensions = listGlfwRequiredExtensions(&glfwExtensionCount);
     const std::vector<VkExtensionProperties> vulkanExtensions = listVulkanSupportedExtensions(&vulkanExtensionCount);
 
     for (int i = 0; i < glfwExtensionCount; i++) {
