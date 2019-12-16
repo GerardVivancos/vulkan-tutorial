@@ -20,3 +20,5 @@ void printVulkanSupportedExtensions();
 const std::vector<const char*> listGlfwRequiredExtensions(uint32_t* count = nullptr);
 void printGlfwRequiredExtensions();
 bool checkGlfwRequiredExtensionsAvailable();
+const std::vector<const char*> listDebugRequiredExtensions();
+const std::vector<const char*> listRequiredExtensions(bool debug = false);

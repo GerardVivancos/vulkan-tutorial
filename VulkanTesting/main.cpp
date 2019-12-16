@@ -89,16 +89,14 @@ class HelloTriangleApplication {
             createInfo.enabledLayerCount = 0;
         }
         
-        /* Now, in order to deal with GLFW windowing we need extensions because Vulkan is platform agnostic.
-         GLFW provides a method that returns the list of Vulkan extensions it requires and receives a pointer to an uint which it will use to write the number of these extensions.
-         We wrap this method so we can use it around.
+        /*
+         We centralized getting all the required extensions because not only GLFW does require extensions.
+         The bool parameter to listRequiredExtensions means whether or not we're in debug mode, which is equivalent to have validation layers enabled.
          We then pass the values to the VkInstanceCreateInfo struct.
          */
-
-        uint32_t glfwExtensionCount = 0;
-        std::vector<const char*> glfwExtensions = listGlfwRequiredExtensions(&glfwExtensionCount);
-        createInfo.enabledExtensionCount = glfwExtensionCount;
-        createInfo.ppEnabledExtensionNames = glfwExtensions.data();
+        std::vector<const char*> extensions = listRequiredExtensions(enableValidationLayers);
+        createInfo.enabledExtensionCount = (uint32_t) extensions.size();
+        createInfo.ppEnabledExtensionNames = extensions.data();
         
         /* Actually create the instance
          The general pattern that object creation function parameters in Vulkan follow is:

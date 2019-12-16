@@ -36,7 +36,7 @@ void printVulkanSupportedExtensions() {
 }
 
 const std::vector<const char*> listGlfwRequiredExtensions(uint32_t* count) {
-    // GLFW provides a method that returns the list of Vulkan extensions it requires and receives a pointer to an uint which it will use to write the number of these extensions.
+    // In order to deal with GLFW windowing we need extensions because Vulkan is platform agnostic. GLFW provides a method that returns the list of Vulkan extensions it requires and receives a pointer to an uint which it will use to write the number of these extensions.
     uint32_t glfwExtensionCount = 0;
     const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
@@ -75,4 +75,22 @@ bool checkGlfwRequiredExtensionsAvailable() {
 
     // Do all the required extensions match?
     return matchingExtensions == glfwExtensionCount;
+}
+
+const std::vector<const char*> listDebugRequiredExtensions() {
+    std::vector<const char*> extensions({VK_EXT_DEBUG_UTILS_EXTENSION_NAME});
+    return extensions;
+}
+
+const std::vector<const char*> listRequiredExtensions(bool debug) {
+    std::vector<const char*> extensions = listGlfwRequiredExtensions();
+    
+    if (debug) {
+        std::vector<const char*> debugExtensions = listDebugRequiredExtensions();
+        
+        // insert at the end of extensions what starts at the beginning of debugExtensions and ranges up to the end of debugExtensions, excluded
+        extensions.insert(extensions.end(), debugExtensions.begin(), debugExtensions.end());
+    }
+    
+    return extensions;
 }
