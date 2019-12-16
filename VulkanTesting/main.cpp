@@ -37,12 +37,14 @@ class HelloTriangleApplication {
     private:
     GLFWwindow* window; // GFLW manages windowing. This is a pointer to our window
     VkInstance instance; // The instance connects the app and the Vulkan library
+    VkDebugUtilsMessengerEXT debugMessenger; // A callback for debugging purposes
     
     void initVulkan() {
         printVulkanSupportedExtensions();
         printGlfwRequiredExtensions();
         checkGlfwRequiredExtensionsAvailable();
         createInstance();
+        setupDebugMessenger();
     }
     
     void mainLoop() {
@@ -52,6 +54,9 @@ class HelloTriangleApplication {
     }
     
     void cleanup() {
+        if (enableValidationLayers) {
+            DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+        }
         vkDestroyInstance(instance, nullptr);
         glfwDestroyWindow(window);
         glfwTerminate();
@@ -111,6 +116,46 @@ class HelloTriangleApplication {
         }
     }
     
+    void setupDebugMessenger() {
+        if (!enableValidationLayers) return;
+        
+        VkDebugUtilsMessengerCreateInfoEXT createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        createInfo.messageSeverity =
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | // Diagnostic messages
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | // Warnings
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;    // Errors
+        createInfo.messageType =
+            VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |    // Event not related to performance or violation of specs
+            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | // Spec violated
+            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT; // Potential non-optimal use
+        createInfo.pfnUserCallback = debugCallback; // Pointer to the actual callback function
+        createInfo.pUserData = nullptr; // Used if we'd like to push custom data to the callback.
+        
+        if (CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to setup debug messenger");
+        }
+    }
+    
+    //This is because the required function comes from extensions, so it's not loaded automatically. This looks for the function address and runs it, returning an error if the extension is nout found.
+    //Made static so it's not tied to the lifetime of the class
+    static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
+        auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+        if (func != nullptr) {
+            return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
+        } else {
+            return VK_ERROR_EXTENSION_NOT_PRESENT;
+        }
+    }
+    
+    //Same as above but for destruction. Important that this is static or we'll race in the cleanup
+    static void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator) {
+        auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+        if (func != nullptr) {
+            return func(instance, debugMessenger, pAllocator);
+        }
+    }
+    
     bool checkValidationLayerSupport() {
         uint32_t layerCount;
         vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
@@ -134,6 +179,19 @@ class HelloTriangleApplication {
         
         return true;
     }
+    
+    // VKAPI_ATTR and VKAPI_CALL are there to ensure this is callable by Vulkan
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+            VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+            VkDebugUtilsMessageTypeFlagsEXT messageType,
+            const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+            void* pUserData){
+        
+        std::cerr << "Validation Layer: " << pCallbackData->pMessage << std::endl;
+        
+        return VK_FALSE; // does the call that triggered this need to be aborted?
+    }
+    
 };
 
 int main() {
