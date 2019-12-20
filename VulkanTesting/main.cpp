@@ -38,6 +38,7 @@ class HelloTriangleApplication {
     GLFWwindow* window; // GFLW manages windowing. This is a pointer to our window
     VkInstance instance; // The instance connects the app and the Vulkan library
     VkDebugUtilsMessengerEXT debugMessenger; // A callback for debugging purposes
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE; // handle to the phyisical device
     
     void initVulkan() {
         printVulkanSupportedExtensions();
@@ -45,6 +46,46 @@ class HelloTriangleApplication {
         checkGlfwRequiredExtensionsAvailable();
         createInstance();
         setupDebugMessenger();
+        pickPhysicalDevice();
+    }
+    
+    void pickPhysicalDevice() {
+        uint32_t deviceCount = 0;
+        vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+        
+        if (deviceCount == 0) {
+            throw std::runtime_error("Failed to find Vulkan GPUs");
+        } else {
+            std::cout << "GPUs found: " << deviceCount << std::endl;
+        }
+        
+        std::vector<VkPhysicalDevice> devices(deviceCount);
+        vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+        
+        for (const auto& device: devices) {
+            if (isDeviceSuitable(device)) {
+                VkPhysicalDeviceProperties deviceProperties;
+                vkGetPhysicalDeviceProperties(device, &deviceProperties);
+                std::ios_base::fmtflags f( std::cout.flags()); // Save std flags to restore them later. Changing output to hex is stateful
+                std::cout << "Device " << deviceProperties.deviceID << " found. Vendor: " << std::hex << deviceProperties.vendorID << ". API version " << std::dec << deviceProperties.apiVersion << std::endl;
+                std::cout.flags(f); // Restore std state
+                physicalDevice = device; //This effectively makes the last GPU found on multi-GPU systems the one chosen
+            }
+        }
+        
+        if (physicalDevice == VK_NULL_HANDLE) {
+            throw std::runtime_error("Failed to select a suitable GPU");
+        } else {
+            VkPhysicalDeviceProperties deviceProperties;
+            vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
+             std::ios_base::fmtflags f( std::cout.flags()); // Save std flags to restore them later. Changing output to hex is stateful
+            std::cout << "Device " << deviceProperties.deviceID << " selected. Vendor: " << deviceProperties.vendorID << ". API version " << deviceProperties.apiVersion << std::endl;
+            std::cout.flags(f); // Restore std state
+        }
+    }
+    
+    bool isDeviceSuitable(VkPhysicalDevice device) {
+        return true; // For now, assume it is
     }
     
     void mainLoop() {
