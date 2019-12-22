@@ -41,6 +41,7 @@ class HelloTriangleApplication {
     VkDebugUtilsMessengerEXT debugMessenger; // A callback for debugging purposes
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE; // handle to the phyisical device
     VkDevice device; // This will be the logical device
+    VkQueue graphicsQueue; // Queues are created along the logical device but we need somewhere to store a handler to them
     
     struct QueueFamilyIndices {
         std::optional<uint32_t> graphicsFamily;
@@ -86,6 +87,9 @@ class HelloTriangleApplication {
         if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create logical device");
         }
+        
+        // This stores a handle to a graphics queue in graphicsQueue. The 0 is the index of the queue within the family. A device can potentially provice multiple queues for the same family. In this case we're only interested in one, so the first one suffices.
+        vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
     }
     
 
