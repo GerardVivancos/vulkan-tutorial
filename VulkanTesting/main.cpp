@@ -4,7 +4,8 @@
 #include <stdexcept>
 #include <functional>
 #include <cstdlib>
-//#include <vector>
+#include <vector>
+#include <optional> //requires c++17
 #include "helper_extensions.h"
 
 const int WIDTH = 800;
@@ -40,6 +41,10 @@ class HelloTriangleApplication {
     VkDebugUtilsMessengerEXT debugMessenger; // A callback for debugging purposes
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE; // handle to the phyisical device
     
+    struct QueueFamilyIndices {
+        std::optional<uint32_t> graphicsFamily;
+    };
+    
     void initVulkan() {
         printVulkanSupportedExtensions();
         printGlfwRequiredExtensions();
@@ -56,6 +61,26 @@ class HelloTriangleApplication {
         std::ios_base::fmtflags f( std::cout.flags()); // Save std flags to restore them later. Changing output to hex is stateful
         std::cout << "DeviceId=" << deviceProperties.deviceID << ". VendorId=0x" << std::hex << deviceProperties.vendorID << ". API version=" << std::dec << deviceProperties.apiVersion << std::endl;
         std::cout.flags(f);
+    }
+    
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
+        QueueFamilyIndices indices;
+        
+        uint32_t queueFamilyCount  = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+        
+        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+        
+        int i = 0;
+        for (const auto& queueFamily: queueFamilies) {
+            if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                indices.graphicsFamily = i;
+            }
+            i++;
+        }
+        
+        return indices;
     }
     
     void pickPhysicalDevice() {
@@ -88,7 +113,8 @@ class HelloTriangleApplication {
     }
     
     bool isDeviceSuitable(VkPhysicalDevice device) {
-        return true; // For now, assume it is
+        QueueFamilyIndices indices = findQueueFamilies(device);
+        return indices.graphicsFamily.has_value(); // We require a graphics queue
     }
     
     void mainLoop() {
