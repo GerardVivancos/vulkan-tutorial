@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <vector>
 #include <optional> //requires c++17
+#include <set>
 #include "helper_extensions.h"
 
 const int WIDTH = 800;
@@ -43,9 +44,15 @@ class HelloTriangleApplication {
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE; // handle to the phyisical device
     VkDevice device; // This will be the logical device
     VkQueue graphicsQueue; // Queues are created along the logical device but we need somewhere to store a handler to them
+    VkQueue presentQueue; // Queues are created along the logical device but we need somewhere to store a handler to them
     
     struct QueueFamilyIndices {
-        std::optional<uint32_t> graphicsFamily;
+        std::optional<uint32_t> graphicsFamily; // Drawing
+        std::optional<uint32_t> presentFamily; // Presenting to surfaces
+        
+        bool isComplete() {
+            return graphicsFamily.has_value() && presentFamily.has_value();
+        }
     };
     
     void initVulkan() {
@@ -70,20 +77,31 @@ class HelloTriangleApplication {
         
         // Create the actual logical queues we're interested in using
         QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
-        VkDeviceQueueCreateInfo queueCreateInfo = {};
-        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
-        queueCreateInfo.queueCount = 1;
+        
+        // Since we're going to need more than one queue...
+        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+        std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value() };
         float queuePriority = 1.0f;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
+        
+        for (uint32_t queueFamily: uniqueQueueFamilies) {
+            // Define each VkDeviceQueueCreateInfo...
+            VkDeviceQueueCreateInfo queueCreateInfo = {};
+            queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            queueCreateInfo.queueFamilyIndex = queueFamily;
+            queueCreateInfo.queueCount = 1;
+            queueCreateInfo.pQueuePriorities = &queuePriority;
+
+            // ...and push them to the vector
+            queueCreateInfos.push_back(queueCreateInfo);
+        }
         
         // Enable the GPU features we want to use. Right now we won't as for any
         VkPhysicalDeviceFeatures deviceFeatures = {};
         
         VkDeviceCreateInfo deviceCreateInfo = {};
         deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
-        deviceCreateInfo.queueCreateInfoCount = 1;
+        deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
+        deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
         deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
         deviceCreateInfo.enabledExtensionCount = 0;
         if (enableValidationLayers) {
@@ -99,6 +117,7 @@ class HelloTriangleApplication {
         
         // This stores a handle to a graphics queue in graphicsQueue. The 0 is the index of the queue within the family. A device can potentially provice multiple queues for the same family. In this case we're only interested in one, so the first one suffices.
         vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
+        vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
     }
     
 
@@ -123,6 +142,11 @@ class HelloTriangleApplication {
         for (const auto& queueFamily: queueFamilies) {
             if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
                 indices.graphicsFamily = i;
+            }
+            VkBool32 presentSupport = false;
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+            if (presentSupport) {
+                indices.presentFamily = i;
             }
             i++;
         }
