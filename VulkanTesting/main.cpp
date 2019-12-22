@@ -39,6 +39,7 @@ class HelloTriangleApplication {
     GLFWwindow* window; // GFLW manages windowing. This is a pointer to our window
     VkInstance instance; // The instance connects the app and the Vulkan library
     VkDebugUtilsMessengerEXT debugMessenger; // A callback for debugging purposes
+    VkSurfaceKHR surface; // A surface is where images actually get rendered to. It is an abstract representation that will be backed by whatever windowing system we're using (GLFW in our case)
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE; // handle to the phyisical device
     VkDevice device; // This will be the logical device
     VkQueue graphicsQueue; // Queues are created along the logical device but we need somewhere to store a handler to them
@@ -53,8 +54,16 @@ class HelloTriangleApplication {
         checkGlfwRequiredExtensionsAvailable();
         createInstance();
         setupDebugMessenger();
+        createSurface();
         pickPhysicalDevice();
         createLogicalDevice();
+    }
+    
+    void createSurface() {
+        // Creating an instance VkSurfaceKHR is platform dependant (while VkSurfaceKHR itself is not). We could use platform-specific methods to create it or, since we're using GLFW, use its own abstractions that will deal with that
+        if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create window surface");
+        }
     }
     
     void createLogicalDevice() {
@@ -166,6 +175,7 @@ class HelloTriangleApplication {
         if (enableValidationLayers) {
             DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
         }
+        vkDestroySurfaceKHR(instance, surface, nullptr);
         vkDestroyInstance(instance, nullptr);
         glfwDestroyWindow(window);
         glfwTerminate();
