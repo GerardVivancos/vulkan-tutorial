@@ -40,6 +40,7 @@ class HelloTriangleApplication {
     VkInstance instance; // The instance connects the app and the Vulkan library
     VkDebugUtilsMessengerEXT debugMessenger; // A callback for debugging purposes
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE; // handle to the phyisical device
+    VkDevice device; // This will be the logical device
     
     struct QueueFamilyIndices {
         std::optional<uint32_t> graphicsFamily;
@@ -52,6 +53,39 @@ class HelloTriangleApplication {
         createInstance();
         setupDebugMessenger();
         pickPhysicalDevice();
+        createLogicalDevice();
+    }
+    
+    void createLogicalDevice() {
+        
+        // Create the actual logical queues we're interested in using
+        QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+        VkDeviceQueueCreateInfo queueCreateInfo = {};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+        queueCreateInfo.queueCount = 1;
+        float queuePriority = 1.0f;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
+        
+        // Enable the GPU features we want to use. Right now we won't as for any
+        VkPhysicalDeviceFeatures deviceFeatures = {};
+        
+        VkDeviceCreateInfo deviceCreateInfo = {};
+        deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+        deviceCreateInfo.queueCreateInfoCount = 1;
+        deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
+        deviceCreateInfo.enabledExtensionCount = 0;
+        if (enableValidationLayers) {
+            deviceCreateInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+            deviceCreateInfo.ppEnabledLayerNames = validationLayers.data();
+        } else {
+            deviceCreateInfo.enabledLayerCount = 0;
+        }
+        
+        if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create logical device");
+        }
     }
     
 
@@ -124,6 +158,7 @@ class HelloTriangleApplication {
     }
     
     void cleanup() {
+        vkDestroyDevice(device, nullptr);
         if (enableValidationLayers) {
             DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
         }
