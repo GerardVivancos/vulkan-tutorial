@@ -52,6 +52,9 @@ class HelloTriangleApplication {
     VkQueue graphicsQueue; // Queues are created along the logical device but we need somewhere to store a handler to them
     VkQueue presentQueue; // Queues are created along the logical device but we need somewhere to store a handler to them
     VkSwapchainKHR swapChain;
+    std::vector<VkImage> swapChainImages;
+    VkFormat swapChainImageFormat;
+    VkExtent2D swapChainExtent;
     
     struct QueueFamilyIndices {
         std::optional<uint32_t> graphicsFamily; // Drawing
@@ -206,6 +209,18 @@ class HelloTriangleApplication {
         if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
             throw std::runtime_error("Could not create swap chain");
         }
+        
+        
+        // imageCount was the minimum number of images we requested, but the device can create any number above that. Now we'll get the actual number
+        vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
+        // then we'll resize the vector
+        swapChainImages.resize(imageCount);
+        // and finally store th handlers to those images
+        vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
+        
+        //store format and extent in member variables for future use
+        swapChainImageFormat = surfaceFormat.format;
+        swapChainExtent = extent;
     }
     
     void createSurface() {
