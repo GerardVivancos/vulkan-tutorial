@@ -7,6 +7,7 @@
 #include <vector>
 #include <optional> //requires c++17
 #include <set>
+#include <cstdint>
 #include "helper_extensions.h"
 
 const int WIDTH = 800;
@@ -17,6 +18,11 @@ const int HEIGHT = 600;
 const std::vector<const char*> validationLayers = {
     // standard validation that comes with the SDK
     "VK_LAYER_KHRONOS_validation"
+};
+
+// Here we list the device extensions we require
+const std::vector<const char*> deviceExtensions {
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME // Not all devices can present. Thus, swapchains are an extension provided by the device
 };
 
 // If not in debug mode, don't enable the validation layers
@@ -45,6 +51,7 @@ class HelloTriangleApplication {
     VkDevice device; // This will be the logical device
     VkQueue graphicsQueue; // Queues are created along the logical device but we need somewhere to store a handler to them
     VkQueue presentQueue; // Queues are created along the logical device but we need somewhere to store a handler to them
+    VkSwapchainKHR swapChain;
     
     struct QueueFamilyIndices {
         std::optional<uint32_t> graphicsFamily; // Drawing
@@ -53,6 +60,12 @@ class HelloTriangleApplication {
         bool isComplete() {
             return graphicsFamily.has_value() && presentFamily.has_value();
         }
+    };
+    
+    struct SwapChainSupportDetails {
+        VkSurfaceCapabilitiesKHR capabilities; // max/min number of images, max/min witdh and height of images
+        std::vector<VkSurfaceFormatKHR> formats; // pixel format and color space
+        std::vector<VkPresentModeKHR> presentModes; // available presentation modes -- like double buffering, triple buffering...
     };
     
     void initVulkan() {
@@ -64,6 +77,135 @@ class HelloTriangleApplication {
         createSurface();
         pickPhysicalDevice();
         createLogicalDevice();
+        createSwapChain();
+    }
+    
+    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
+        SwapChainSupportDetails details;
+        
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
+        
+        uint32_t formatCount;
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+        if (formatCount !=0) {
+            details.formats.resize(formatCount); // properly allocate the vector
+            vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
+        }
+        
+        uint32_t presentModeCount;
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+        if (presentModeCount != 0) {
+            details.presentModes.resize(presentModeCount); // properly allocate the vector
+            vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
+        }
+        
+        return details;
+    }
+    
+    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+        // If SRGB available, use it
+        for (const auto& availableFormat : availableFormats) {
+            if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM &&
+                availableFormat.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR) {
+                return availableFormat;
+            }
+        }
+        
+        // Else, return whatever the first format available is
+        return availableFormats[0];
+    }
+    
+    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
+        /* Four modes are available:
+         - VK_PRESENT_MODE_IMMEDIATE_KHR: Images sent right away to the screen, which may result in tearing.
+         - VK_PRESENT_MODE_FIFO_KHR: Queue mode, where the display takes an image from the front of the queue on refresh while the app pushes images to the back. App has to wait if queue is full. Similar to VSYNC.
+         - VK_PRESENT_MODE_FIFO_RELAXED_KHR: Same but if there's no image on refresh, next image will get drawn once is ready. Like "variable vsync", which might result in tearing
+         - VK_PRESENT_MODE_MAILBOX_KHR: Like FIFO but discard images from the queue if the queue is full when the app submits a new one. This discards frames in that case. Similar to triple buffering.
+         
+         Only VK_PRESENT_MODE_FIFO_KHR is guaranteed to be available.
+         */
+        
+        for (const auto& availablePresentMode : availablePresentModes) {
+            // Should we have triple buffer, use it
+            if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+                return availablePresentMode;
+            }
+        }
+        
+        // else, let's stick with the guaranteed one
+        return VK_PRESENT_MODE_FIFO_KHR;
+    }
+    
+    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
+        // This is the resolution of the images in the swap chain. Should be equal to the resolution of the window.
+        // The ranges avaiable are in VkSurfaceCapabilitiesKHR.currentExtent.
+        // Some window managers store there a special value equal to the maximum uint32_t.
+        
+        if (capabilities.currentExtent.width != UINT32_MAX) {
+            // if the current extent has no special value, use it because it's automatched
+            return capabilities.currentExtent;
+        } else {
+            // use the dimensions we defined for the window within the min/max bounds
+            VkExtent2D actualExtent = {WIDTH, HEIGHT};
+            actualExtent.width = std::max(capabilities.minImageExtent.width,
+                                          std::min(capabilities.maxImageExtent.width,
+                                                   actualExtent.width));
+            actualExtent.height = std::max(capabilities.minImageExtent.height,
+            std::min(capabilities.maxImageExtent.height,
+                     actualExtent.height));
+            return actualExtent;
+        }
+    }
+    
+    void createSwapChain() {
+        SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
+        VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
+        VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+        VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+        
+        // theres a min and max number of images on the swap chain, it varies by implementation
+        // If we stick to the minimum, we'll have to wait a lot, so we require at lest one one than the min
+        uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+        
+        // there's a special value 0 for the max which means "no max". Either way, let's try not to get over the max if there's any
+        if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
+            imageCount = swapChainSupport.capabilities.maxImageCount;
+        }
+        
+        VkSwapchainCreateInfoKHR createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        createInfo.surface = surface;
+        createInfo.minImageCount = imageCount;
+        createInfo.imageFormat = surfaceFormat.format;
+        createInfo.imageColorSpace = surfaceFormat.colorSpace;
+        createInfo.imageExtent = extent;
+        createInfo.imageArrayLayers = 1; // Always 1 unless stereoscopic
+        createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // Color attachment: basically, draw to this
+        createInfo.preTransform = swapChainSupport.capabilities.currentTransform; // if we don't want to transform (rotate, etc), use the current transform, which does nothing
+        createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // Ignore alpha channel
+        createInfo.presentMode = presentMode;
+        createInfo.clipped = VK_TRUE; // Don't write to pixels covered by other windows
+        createInfo.oldSwapchain = VK_NULL_HANDLE; // This would be used if we wanted to recreate the swap chain, we would point to the old one
+        
+        QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+        uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+        
+        // Some GPUs will have the same family for graphics and presentation, some will have different families
+        if (indices.graphicsFamily != indices.presentFamily) {
+            // If they are different, use concurrent sharing more. An image is owned by either family and ownership transfers explicitly. Best performance
+            createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+            createInfo.queueFamilyIndexCount = 2;
+            createInfo.pQueueFamilyIndices = queueFamilyIndices;
+        } else {
+            // If they are the same, let them have exclusive access because they won't be competing anyway
+            createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            createInfo.queueFamilyIndexCount = 0; // optional
+            createInfo.pQueueFamilyIndices = nullptr; // optional
+        }
+        
+        if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
+            throw std::runtime_error("Could not create swap chain");
+        }
     }
     
     void createSurface() {
@@ -103,7 +245,8 @@ class HelloTriangleApplication {
         deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
         deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
         deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
-        deviceCreateInfo.enabledExtensionCount = 0;
+        deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+        deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
         if (enableValidationLayers) {
             deviceCreateInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
             deviceCreateInfo.ppEnabledLayerNames = validationLayers.data();
@@ -185,7 +328,33 @@ class HelloTriangleApplication {
     
     bool isDeviceSuitable(VkPhysicalDevice device) {
         QueueFamilyIndices indices = findQueueFamilies(device);
-        return indices.graphicsFamily.has_value(); // We require a graphics queue
+        bool extensionsSupported = checkDeviceExtensionSupport(device);
+        
+        bool swapChainAdequate = false; // Assume the worse
+        if (extensionsSupported) { // important to query about swap chain support if and only if the extension is available
+            SwapChainSupportDetails swapChainSupoprt = querySwapChainSupport(device);
+            swapChainAdequate = !swapChainSupoprt.formats.empty() && !swapChainSupoprt.presentModes.empty();
+        }
+        
+        return indices.graphicsFamily.has_value() && indices.presentFamily.has_value() && extensionsSupported && swapChainAdequate; // We require a graphics queue, a presentation queue and proper swapchain support
+    }
+    
+    bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
+        uint32_t extensionCount;
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+        
+        std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+        
+        std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
+        
+        for (const auto& extension : availableExtensions) {
+            // the idea here is that we'll erase all required extensions once they're found.
+            requiredExtensions.erase(extension.extensionName);
+        }
+        
+        // if the set is empty, then all the required extensions where found
+        return requiredExtensions.empty();
     }
     
     void mainLoop() {
@@ -195,6 +364,7 @@ class HelloTriangleApplication {
     }
     
     void cleanup() {
+        vkDestroySwapchainKHR(device, swapChain, nullptr);
         vkDestroyDevice(device, nullptr);
         if (enableValidationLayers) {
             DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
