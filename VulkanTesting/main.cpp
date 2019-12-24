@@ -55,6 +55,7 @@ class HelloTriangleApplication {
     std::vector<VkImage> swapChainImages;
     VkFormat swapChainImageFormat;
     VkExtent2D swapChainExtent;
+    std::vector<VkImageView> swapChainImageViews; // they describe how to access images and which parts of them to access
     
     struct QueueFamilyIndices {
         std::optional<uint32_t> graphicsFamily; // Drawing
@@ -81,6 +82,7 @@ class HelloTriangleApplication {
         pickPhysicalDevice();
         createLogicalDevice();
         createSwapChain();
+        createImageViews();
     }
     
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
@@ -157,6 +159,35 @@ class HelloTriangleApplication {
             std::min(capabilities.maxImageExtent.height,
                      actualExtent.height));
             return actualExtent;
+        }
+    }
+    
+    void createImageViews() {
+        // We need as many views as there are images
+        swapChainImageViews.resize(swapChainImages.size());
+        
+        for (size_t i = 0; i < swapChainImages.size(); i++) {
+            VkImageViewCreateInfo createInfo = {};
+            createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            createInfo.image = swapChainImages[i];
+            createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // 2d texture/canvas. This could be 1d, 3d, cubemap...
+            createInfo.format = swapChainImageFormat;
+            //we can play around with color channels, but we'll stick to default mapping:
+            createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+            createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+            createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+            createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+            //the following attributes describe the image's purpose. This time, it's just a color target
+            createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            createInfo.subresourceRange.baseMipLevel = 0;
+            createInfo.subresourceRange.levelCount = 1;
+            createInfo.subresourceRange.baseArrayLayer = 0;
+            // If it were stereoscopic, we would create one view per layer of an image
+            createInfo.subresourceRange.layerCount = 1;
+            
+            if (vkCreateImageView(device, &createInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to create image views");
+                };
         }
     }
     
@@ -379,6 +410,10 @@ class HelloTriangleApplication {
     }
     
     void cleanup() {
+        for (auto imageView : swapChainImageViews) {
+            vkDestroyImageView(device, imageView, nullptr);
+        }
+        
         vkDestroySwapchainKHR(device, swapChain, nullptr);
         vkDestroyDevice(device, nullptr);
         if (enableValidationLayers) {
