@@ -57,6 +57,7 @@ class HelloTriangleApplication {
     VkFormat swapChainImageFormat;
     VkExtent2D swapChainExtent;
     std::vector<VkImageView> swapChainImageViews; // they describe how to access images and which parts of them to access
+    VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout; // used to change behaviour of shaders after pipeline is created
     
     struct QueueFamilyIndices {
@@ -85,6 +86,7 @@ class HelloTriangleApplication {
         createLogicalDevice();
         createSwapChain();
         createImageViews();
+        createRenderPass();
         createGraphicsPipeline();
     }
     
@@ -183,6 +185,48 @@ class HelloTriangleApplication {
         file.close();
         
         return buffer;
+    }
+    
+    void createRenderPass() {
+        VkAttachmentDescription colorAttachment = {};
+        colorAttachment.format = swapChainImageFormat;
+        // no multisampling
+        colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        // what to do with the attachment when the rederpass begins and loads it and ends and saves it
+        /*
+         - VK_ATTACHMENT_LOAD_OP_LOAD: Preserve the existing contents of the at- tachment
+         - VK_ATTACHMENT_LOAD_OP_CLEAR: Clear the values to a constant at the start
+         - VK_ATTACHMENT_LOAD_OP_DONT_CARE: Existing contents are undefined; we don’t care about them
+         */
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        // Above applies to color and depth data. Below to stencil, which we're not using
+        colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        // format when we load
+        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        // format when we save. Has to do with what we're doing next with it
+        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        
+        VkAttachmentReference colorAttachmentRef = {};
+        colorAttachmentRef.attachment = 0; // this binds to location(layout=0) in the fragment shader
+        colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        
+        VkSubpassDescription subpass = {};
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 1;
+        subpass.pColorAttachments = & colorAttachmentRef;
+        
+        VkRenderPassCreateInfo renderPassInfo = {};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassInfo.attachmentCount = 1;
+        renderPassInfo.pAttachments = &colorAttachment;
+        renderPassInfo.subpassCount = 1;
+        renderPassInfo.pSubpasses = &subpass;
+        
+        if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create renderpass");
+        }
     }
     
     void createGraphicsPipeline() {
@@ -576,7 +620,7 @@ class HelloTriangleApplication {
     
     void cleanup() {
         vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-        
+        vkDestroyRenderPass(device, renderPass, nullptr);
         for (auto imageView : swapChainImageViews) {
             vkDestroyImageView(device, imageView, nullptr);
         }
