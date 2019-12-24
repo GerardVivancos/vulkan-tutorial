@@ -8,6 +8,7 @@
 #include <optional> //requires c++17
 #include <set>
 #include <cstdint>
+#include <fstream>
 #include "helper_extensions.h"
 
 const int WIDTH = 800;
@@ -56,6 +57,7 @@ class HelloTriangleApplication {
     VkFormat swapChainImageFormat;
     VkExtent2D swapChainExtent;
     std::vector<VkImageView> swapChainImageViews; // they describe how to access images and which parts of them to access
+    VkPipelineLayout pipelineLayout; // used to change behaviour of shaders after pipeline is created
     
     struct QueueFamilyIndices {
         std::optional<uint32_t> graphicsFamily; // Drawing
@@ -83,6 +85,7 @@ class HelloTriangleApplication {
         createLogicalDevice();
         createSwapChain();
         createImageViews();
+        createGraphicsPipeline();
     }
     
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
@@ -160,6 +163,168 @@ class HelloTriangleApplication {
                      actualExtent.height));
             return actualExtent;
         }
+    }
+    
+    static std::vector<char> readFile(const std::string& filename) {
+        std::cout << "Loading " << filename << std::endl;
+        // ate: read at the end, so the read position determines file size; binary: avoid text transformations
+        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+        
+        if (!file.is_open()) {
+            throw std::runtime_error("Failed to open file");
+        }
+        
+        size_t fileSize = (size_t) file.tellg();
+        std::vector<char> buffer(fileSize);
+        
+        // seek back to the beginning
+        file.seekg(0);
+        file.read(buffer.data(), fileSize);
+        file.close();
+        
+        return buffer;
+    }
+    
+    void createGraphicsPipeline() {
+        auto vertShaderCode = readFile("shaders/vert.spv");
+        auto fragShaderCode = readFile("shaders/frag.spv");
+        
+        VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+        VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+        
+        VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+        vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        vertShaderStageInfo.module = vertShaderModule;
+        vertShaderStageInfo.pName = "main"; //entrypoint
+        
+        VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
+        fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        vertShaderStageInfo.module = fragShaderModule;
+        vertShaderStageInfo.pName = "main";
+        
+        VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+        
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        // Bindings define spacing between data (how do we separate itemps in the vertex list or in the instance list) and wheteher this is a list of vertices or instances.
+        // Since this time we generate the vertices on the vertex shader, we will pass nothing.
+        vertexInputInfo.vertexBindingDescriptionCount = 0;
+        vertexInputInfo.pVertexBindingDescriptions = nullptr;
+        // Attributes of the vertices when passed to the shader.
+        // This time, no vertices, no attributes.
+        vertexInputInfo.vertexAttributeDescriptionCount = 0;
+        vertexInputInfo.pVertexBindingDescriptions = nullptr;
+        
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+        inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        /* what kind of geometry to draw from the vertices (how to interpret the vertex list)
+         -  VK_PRIMITIVE_TOPOLOGY_POINT_LIST: points from vertices
+         - VK_PRIMITIVE_TOPOLOGY_LINE_LIST: line from every 2 vertices without
+         reuse
+         - VK_PRIMITIVE_TOPOLOGY_LINE_STRIP: the end vertex of every line is used
+         as start vertex for the next line
+         - VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST: triangle from every 3 vertices
+         without reuse
+         - VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP: the second and third vertex
+         of every triangle are used as first two vertices of the next triangle
+         */
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        // for _STRIP topologies, interpret special values of 0xFFFF or 0xFFFFFFFF as a break up on the list
+        inputAssembly.primitiveRestartEnable = VK_FALSE;
+        
+        // The region of the framebuffer the output will be rendered to
+        VkViewport viewport = {};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = (float) swapChainExtent.width;
+        viewport.height = (float) swapChainExtent.height;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        
+        // While viewports define the transformation from the image to the framebuffer, scissor rectangles define in which regions pixels will actually be stored. Can be seen as something similar to a mask region
+        // We will not cut out anything
+        VkRect2D scissor = {};
+        scissor.offset = {0, 0};
+        scissor.extent = swapChainExtent;
+        
+        // Need to combine viewport and scissor into viewportState
+        VkPipelineViewportStateCreateInfo viewportState = {};
+        viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        viewportState.viewportCount = 1;
+        viewportState.pViewports = &viewport;
+        viewportState.scissorCount = 1;
+        viewportState.pScissors = &scissor;
+        
+        // The rasterizer takes geometry and makes it fragments
+        VkPipelineRasterizationStateCreateInfo rasterizer = {};
+        rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        // When false, fragments outside the near and far planes are discarded. When true, they are clamped to that range, but this requires a GPU feature
+        rasterizer.depthClampEnable = VK_FALSE;
+        /*
+         - VK_POLYGON_MODE_FILL: fill the area of the polygon with fragments
+         - VK_POLYGON_MODE_LINE: polygon edges are drawn as lines
+         - VK_POLYGON_MODE_POINT: polygon vertices are drawn as points
+         */
+        rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterizer.lineWidth = 1.0f;
+        // whether or not to cull faces and how (discard based on where they're pointing to)
+        rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+        // how do we consider what's front or back facing
+        rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+        // depth values can be altered by constants. We won't
+        rasterizer.depthBiasEnable = VK_FALSE;
+        
+        // antialias by combining the result of fragment shaders from multiple polygons that end up on the same pixel
+        VkPipelineMultisampleStateCreateInfo multisampling = {};
+        multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        // we won't use it. If we wanted to, we'd require a GPU feature
+        multisampling.sampleShadingEnable = VK_FALSE;
+        multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+        
+        // Color blending is combining the output from the fragment shader with the color already in the framebuffer. We can mix the colors into a new one or combine them using a bitwise operation
+        // We need two structures to configure color blending
+        
+        // Configuration per attached framebuffer:
+        VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+        // all colors, no mask
+        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        colorBlendAttachment.blendEnable = VK_FALSE;
+        
+        // Configuration for all the framebuffers
+        VkPipelineColorBlendStateCreateInfo colorBlending = {};
+        colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        colorBlending.logicOpEnable = VK_FALSE;
+        colorBlending.attachmentCount = 1;
+        colorBlending.pAttachments = &colorBlendAttachment;
+        
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        // wont' need anything for now...
+        
+        if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create pipeline layout");
+        }
+        
+        // it's ok that shader modules' lifetime is local because they are only needed at pipeline creation
+        vkDestroyShaderModule(device, vertShaderModule, nullptr);
+        vkDestroyShaderModule(device, fragShaderModule, nullptr);
+    }
+    
+    VkShaderModule createShaderModule(const std::vector<char>& code) {
+        VkShaderModuleCreateInfo createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        createInfo.codeSize = code.size();
+        // size of code is in bytes but pointer is a uint32_t instead of char
+        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+        
+        VkShaderModule shaderModule;
+        if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create shader module");
+        }
+        
+        return shaderModule;
     }
     
     void createImageViews() {
@@ -410,6 +575,8 @@ class HelloTriangleApplication {
     }
     
     void cleanup() {
+        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+        
         for (auto imageView : swapChainImageViews) {
             vkDestroyImageView(device, imageView, nullptr);
         }

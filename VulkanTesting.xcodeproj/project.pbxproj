@@ -15,6 +15,7 @@
 		CF463C53239972B500A96034 /* libvulkan.1.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = CF463C4E2399728F00A96034 /* libvulkan.1.dylib */; };
 		CF463C54239972B500A96034 /* libglfw.3.4.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = CF463C4C2399726B00A96034 /* libglfw.3.4.dylib */; };
 		CFB3C12B23A6F37400D297B6 /* helper_extensions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CFB3C12923A6F37400D297B6 /* helper_extensions.cpp */; };
+		CFBBA19923B20ECA00311D85 /* shaders in CopyFiles */ = {isa = PBXBuildFile; fileRef = CFBBA19623B20D4D00311D85 /* shaders */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -24,6 +25,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
+				CFBBA19923B20ECA00311D85 /* shaders in CopyFiles */,
 				CF463C52239972B500A96034 /* libvulkan.1.1.126.dylib in CopyFiles */,
 				CF463C53239972B500A96034 /* libvulkan.1.dylib in CopyFiles */,
 				CF463C54239972B500A96034 /* libglfw.3.4.dylib in CopyFiles */,
@@ -41,6 +43,7 @@
 		CF463C55239974B200A96034 /* vulkan.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = vulkan.framework; path = "../vulkansdk-macos-1.1.126.0/macOS/Frameworks/vulkan.framework"; sourceTree = "<group>"; };
 		CFB3C12923A6F37400D297B6 /* helper_extensions.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = helper_extensions.cpp; sourceTree = "<group>"; };
 		CFB3C12A23A6F37400D297B6 /* helper_extensions.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = helper_extensions.h; sourceTree = "<group>"; };
+		CFBBA19623B20D4D00311D85 /* shaders */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = shaders; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -77,6 +80,7 @@
 		CF10C4E62399714D00DEF716 /* VulkanTesting */ = {
 			isa = PBXGroup;
 			children = (
+				CFBBA19623B20D4D00311D85 /* shaders */,
 				CF10C4E72399714D00DEF716 /* main.cpp */,
 				CFB3C12923A6F37400D297B6 /* helper_extensions.cpp */,
 				CFB3C12A23A6F37400D297B6 /* helper_extensions.h */,
