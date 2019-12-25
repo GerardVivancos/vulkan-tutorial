@@ -59,6 +59,7 @@ class HelloTriangleApplication {
     std::vector<VkImageView> swapChainImageViews; // they describe how to access images and which parts of them to access
     VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout; // used to change behaviour of shaders after pipeline is created
+    VkPipeline graphicsPipeline;
     
     struct QueueFamilyIndices {
         std::optional<uint32_t> graphicsFamily; // Drawing
@@ -230,6 +231,14 @@ class HelloTriangleApplication {
     }
     
     void createGraphicsPipeline() {
+        /*
+         Creating a graphics pipeline requires a bunch of objects:
+         - Shader stages: the shader modules that define the functionality of the programmable stages of the graphics pipeline
+         - Fixed-function state: all of the structures that define the fixed-function stages of the pipeline, like input assembly, rasterizer, viewport and color blending
+         - Pipeline layout: the uniform and push values referenced by the shader that can be updated at draw time
+         - Render pass: the attachments referenced by the pipeline stages and their usage
+         */
+        
         auto vertShaderCode = readFile("shaders/vert.spv");
         auto fragShaderCode = readFile("shaders/frag.spv");
         
@@ -343,12 +352,39 @@ class HelloTriangleApplication {
         colorBlending.attachmentCount = 1;
         colorBlending.pAttachments = &colorBlendAttachment;
         
+        // This are values referenced by shaders that can be updated at draw time
         VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         // wont' need anything for now...
         
         if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create pipeline layout");
+        }
+        
+        VkGraphicsPipelineCreateInfo pipelineInfo = {};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.stageCount = 2;
+        pipelineInfo.pStages = shaderStages;
+        pipelineInfo.pVertexInputState = &vertexInputInfo;
+        pipelineInfo.pInputAssemblyState = &inputAssembly;
+        pipelineInfo.pViewportState = &viewportState;
+        pipelineInfo.pRasterizationState = &rasterizer;
+        pipelineInfo.pMultisampleState = &multisampling;
+        pipelineInfo.pDepthStencilState = nullptr;
+        pipelineInfo.pColorBlendState = &colorBlending;
+        pipelineInfo.pDynamicState = nullptr;
+        pipelineInfo.layout = pipelineLayout;
+        pipelineInfo.renderPass = renderPass;
+        pipelineInfo.subpass = 0;
+        // next parameters would be useful if we wanted to create derivative graphics pipelines (like optimizing from a common parent, etc)
+        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+        pipelineInfo.basePipelineIndex = -1;
+        
+        
+        // second param is a pointer to the pipeline cache, which we dont' have
+        // third parameter is the amount of pipelineCreateInfos that we'll input, since this function allows for creating multiple pipielines at once
+        if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create graphics pipeline");
         }
         
         // it's ok that shader modules' lifetime is local because they are only needed at pipeline creation
@@ -619,6 +655,7 @@ class HelloTriangleApplication {
     }
     
     void cleanup() {
+        vkDestroyPipeline(device, graphicsPipeline, nullptr);
         vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
         vkDestroyRenderPass(device, renderPass, nullptr);
         for (auto imageView : swapChainImageViews) {
